@@ -12,10 +12,14 @@ public class MainClass {
 
 package main;
 
+package main;
+
 public class Game {
 	private GameWindow gameWindow;
+	private GamePanel gamePanel;
 	public Game() {
 		gameWindow = new GameWindow();
+		gamePane = new GamePanel();
 	}
 
 }
