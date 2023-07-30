@@ -12,14 +12,12 @@ public class MainClass {
 
 package main;
 
-package main;
-
 public class Game {
 	private GameWindow gameWindow;
 	private GamePanel gamePanel;
 	public Game() {
-		gameWindow = new GameWindow();
-		gamePane = new GamePanel();
+		gamePanel = new GamePanel();
+		gameWindow = new GameWindow(gamePanel);
 	}
 
 }
@@ -31,13 +29,32 @@ import javax.swing.JFrame;
 
 public class GameWindow {
 	private JFrame jframe;
-   public GameWindow() {
+   public GameWindow(GamePanel gamePanel) {
 	   jframe = new JFrame();
 	   jframe.setSize(400, 400);
 	   jframe.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+	   jframe.add(gamePanel);
 	   jframe.setVisible(true);
    }
    }
+
+package main;
+
+import java.awt.Graphics;
+
+import javax.swing.JPanel;
+
+public class GamePanel extends JPanel {
+     public GamePanel() {
+     }
+     public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        g.drawRect(100, 100, 200, 50);
+     }
+}
+
+
+
 
 
 
