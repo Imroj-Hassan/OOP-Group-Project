@@ -1,13 +1,10 @@
 package main;
 
-
-public class MainClass  {
+public class MainClass {
 
 	public static void main(String[] args) {
 		new Game();
-
 	}
-
 
 }
 package main;
@@ -15,6 +12,7 @@ package main;
 import java.awt.Graphics;
 
 import entities.Player;
+import levels.LevelManager;
 
 public class Game implements Runnable {
 
@@ -23,8 +21,16 @@ public class Game implements Runnable {
 	private Thread gameThread;
 	private final int FPS_SET = 120;
 	private final int UPS_SET = 200;
-
 	private Player player;
+	private LevelManager levelManager;
+
+	public final static int TILES_DEFAULT_SIZE = 22;
+	public final static float SCALE = 2f;
+	public final static int TILES_IN_WIDTH = 26;
+	public final static int TILES_IN_HEIGHT = 14;
+	public final static int TILES_SIZE = (int) (TILES_DEFAULT_SIZE * SCALE);
+	public final static int GAME_WIDTH = TILES_SIZE * TILES_IN_WIDTH;
+	public final static int GAME_HEIGHT = TILES_SIZE * TILES_IN_HEIGHT;
 
 	public Game() {
 		initClasses();
@@ -37,7 +43,9 @@ public class Game implements Runnable {
 	}
 
 	private void initClasses() {
-		player = new Player(200, 200);
+		levelManager = new LevelManager(this);
+		player = new Player(200, 200, (int) (64 * SCALE), (int) (40 * SCALE));
+		player.loadLvlData(levelManager.getCurrentLevel().getLevelData());
 
 	}
 
@@ -47,10 +55,12 @@ public class Game implements Runnable {
 	}
 
 	public void update() {
+		levelManager.update();
 		player.update();
 	}
 
 	public void render(Graphics g) {
+		levelManager.draw(g);
 		player.render(g);
 	}
 
@@ -110,23 +120,13 @@ public class Game implements Runnable {
 }
 package main;
 
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowFocusListener;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
-
-import javax.imageio.ImageIO;
 import javax.swing.JPanel;
-
 import inputs.KeyboardInputs;
 import inputs.MouseInputs;
-
-import static utilz.Constants.PlayerConstants.*;
-import static utilz.Constants.Directions.*;
+import static main.Game.GAME_HEIGHT;
+import static main.Game.GAME_WIDTH;
 
 public class GamePanel extends JPanel {
 
@@ -136,16 +136,14 @@ public class GamePanel extends JPanel {
 	public GamePanel(Game game) {
 		mouseInputs = new MouseInputs(this);
 		this.game = game;
-
 		setPanelSize();
 		addKeyListener(new KeyboardInputs(this));
 		addMouseListener(mouseInputs);
 		addMouseMotionListener(mouseInputs);
-
 	}
 
 	private void setPanelSize() {
-		Dimension size = new Dimension(1280, 800);
+		Dimension size = new Dimension(GAME_WIDTH, GAME_HEIGHT);
 		setPreferredSize(size);
 	}
 
@@ -155,14 +153,7 @@ public class GamePanel extends JPanel {
 
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
-
-		g.setColor(Color.white);
-		for (int i = 0; i < 64; i++)
-			for (int j = 0; j < 40; j++)
-				g.fillRect(i * 20, j * 20, 20, 20);
-
 		game.render(g);
-
 	}
 
 	public Game getGame() {
@@ -209,26 +200,55 @@ public class GameWindow {
 }
 package entities;
 
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Rectangle;
+import java.awt.geom.Rectangle2D;
+
 public abstract class Entity {
-	
-	protected float x,y;
-	public Entity(float x, float y) {
+
+	protected float x, y;
+	protected int width, height;
+	protected Rectangle2D.Float hitbox;
+
+	public Entity(float x, float y, int width, int height) {
 		this.x = x;
 		this.y = y;
-	
+		this.width = width;
+		this.height = height;
+
+	}
+
+	protected void drawHitbox(Graphics g) {
+		// For debugging the hitbox
+		g.setColor(Color.PINK);
+		g.drawRect((int) hitbox.x, (int) hitbox.y, (int) hitbox.width, (int) hitbox.height);
+
+	}
+
+	protected void initHitbox(float x, float y, float width, float height) {
+		hitbox = new Rectangle2D.Float(x, y, width, height);
+	}
+
+//	protected void updateHitbox() {
+//		hitbox.x = (int) x;
+//		hitbox.y = (int) y;
+//	}
+
+	public Rectangle2D.Float getHitbox() {
+		return hitbox;
 	}
 
 }
 package entities;
 
 import static utilz.Constants.PlayerConstants.*;
-
+import static utilz.HelpMethods.CanMoveHere;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
 
-import javax.imageio.ImageIO;
+import main.Game;
+import utilz.LoadSave;
 
 public class Player extends Entity {
 	private BufferedImage[][] animations;
@@ -237,10 +257,15 @@ public class Player extends Entity {
 	private boolean moving = false, attacking = false;
 	private boolean left, up, right, down;
 	private float playerSpeed = 2.0f;
+	private int[][] lvlData;
+	private float xDrawOffset = 21 * Game.SCALE;
+	private float yDrawOffset = 4 * Game.SCALE;
 
-	public Player(float x, float y) {
-		super(x, y);
+	public Player(float x, float y, int width, int height) {
+		super(x, y, width, height);
 		loadAnimations();
+		initHitbox(x, y, 20 * Game.SCALE, 28 * Game.SCALE);
+
 	}
 
 	public void update() {
@@ -250,7 +275,8 @@ public class Player extends Entity {
 	}
 
 	public void render(Graphics g) {
-		g.drawImage(animations[playerAction][aniIndex], (int) x, (int) y, 256, 160, null);
+		g.drawImage(animations[playerAction][aniIndex], (int) (hitbox.x - xDrawOffset), (int) (hitbox.y - yDrawOffset), width, height, null);
+		drawHitbox(g);
 	}
 
 	private void updateAnimationTick() {
@@ -289,43 +315,48 @@ public class Player extends Entity {
 
 	private void updatePos() {
 		moving = false;
+		if (!left && !right && !up && !down)
+			return;
 
-		if (left && !right) {
-			x -= playerSpeed;
-			moving = true;
-		} else if (right && !left) {
-			x += playerSpeed;
+		float xSpeed = 0, ySpeed = 0;
+
+		if (left && !right)
+			xSpeed = -playerSpeed;
+		else if (right && !left)
+			xSpeed = playerSpeed;
+
+		if (up && !down)
+			ySpeed = -playerSpeed;
+		else if (down && !up)
+			ySpeed = playerSpeed;
+
+//		if (CanMoveHere(x + xSpeed, y + ySpeed, width, height, lvlData)) {
+//			this.x += xSpeed;
+//			this.y += ySpeed;
+//			moving = true;
+//		}
+
+		if (CanMoveHere(hitbox.x + xSpeed, hitbox.y + ySpeed, hitbox.width, hitbox.height, lvlData)) {
+			hitbox.x += xSpeed;
+			hitbox.y += ySpeed;
 			moving = true;
 		}
 
-		if (up && !down) {
-			y -= playerSpeed;
-			moving = true;
-		} else if (down && !up) {
-			y += playerSpeed;
-			moving = true;
-		}
 	}
 
 	private void loadAnimations() {
-		InputStream is = getClass().getResourceAsStream("/player_sprites.png");
-		try {
-			BufferedImage img = ImageIO.read(is);
 
-			animations = new BufferedImage[9][6];
-			for (int j = 0; j < animations.length; j++)
-				for (int i = 0; i < animations[j].length; i++)
-					animations[j][i] = img.getSubimage(i * 64, j * 40, 64, 40);
+		BufferedImage img = LoadSave.GetSpriteAtlas(LoadSave.PLAYER_ATLAS);
 
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				is.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+		animations = new BufferedImage[9][6];
+		for (int j = 0; j < animations.length; j++)
+			for (int i = 0; i < animations[j].length; i++)
+				animations[j][i] = img.getSubimage(i * 64, j * 40, 64, 40);
+
+	}
+
+	public void loadLvlData(int[][] lvlData) {
+		this.lvlData = lvlData;
 	}
 
 	public void resetDirBooleans() {
@@ -487,9 +518,76 @@ public class MouseInputs implements MouseListener, MouseMotionListener {
 	}
 
 }
+package levels;
+
+public class Level {
+
+	private int[][] lvlData;
+
+	public Level(int[][] lvlData) {
+		this.lvlData = lvlData;
+	}
+
+	public int getSpriteIndex(int x, int y) {
+		return lvlData[y][x];
+	}
+
+	public int[][] getLevelData() {
+		return lvlData;
+	}
+
+}
+package levels;
+
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
+
+import main.Game;
+import utilz.LoadSave;
+
+public class LevelManager {
+
+	private Game game;
+	private BufferedImage[] levelSprite;
+	private Level levelOne;
+
+	public LevelManager(Game game) {
+		this.game = game;
+		importOutsideSprites();
+		levelOne = new Level(LoadSave.GetLevelData());
+	}
+
+	private void importOutsideSprites() {
+		BufferedImage img = LoadSave.GetSpriteAtlas(LoadSave.LEVEL_ATLAS);
+		levelSprite = new BufferedImage[48];
+		for (int j = 0; j < 4; j++)
+			for (int i = 0; i < 12; i++) {
+				int index = j * 12 + i;
+				levelSprite[index] = img.getSubimage(i * 32, j * 32, 32, 32);
+			}
+	}
+
+	public void draw(Graphics g) {
+		for (int j = 0; j < Game.TILES_IN_HEIGHT; j++)
+			for (int i = 0; i < Game.TILES_IN_WIDTH; i++) {
+				int index = levelOne.getSpriteIndex(i, j);
+				g.drawImage(levelSprite[index], Game.TILES_SIZE * i, Game.TILES_SIZE * j, Game.TILES_SIZE, Game.TILES_SIZE, null);
+			}
+	}
+
+	public void update() {
+
+	}
+
+	public Level getCurrentLevel() {
+		return levelOne;
+	}
+
+}
 package utilz;
 
 public class Constants {
+
 	public static class Directions {
 		public static final int LEFT = 0;
 		public static final int UP = 1;
@@ -530,4 +628,86 @@ public class Constants {
 		}
 	}
 
+}
+package utilz;
+
+import main.Game;
+
+public class HelpMethods {
+
+	public static boolean CanMoveHere(float x, float y, float width, float height, int[][] lvlData) {
+		if (!IsSolid(x, y, lvlData))
+			if (!IsSolid(x + width, y + height, lvlData))
+				if (!IsSolid(x + width, y, lvlData))
+					if (!IsSolid(x, y + height, lvlData))
+						return true;
+		return false;
+	}
+
+	private static boolean IsSolid(float x, float y, int[][] lvlData) {
+		if (x < 0 || x >= Game.GAME_WIDTH)
+			return true;
+		if (y < 0 || y >= Game.GAME_HEIGHT)
+			return true;
+
+		float xIndex = x / Game.TILES_SIZE;
+		float yIndex = y / Game.TILES_SIZE;
+
+		int value = lvlData[(int) yIndex][(int) xIndex];
+
+		if (value >= 48 || value < 0 || value != 11)
+			return true;
+		return false;
+	}
+}
+package utilz;
+
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+
+import javax.imageio.ImageIO;
+
+import main.Game;
+
+public class LoadSave {
+
+	public static final String PLAYER_ATLAS = "player_sprites.png";
+	public static final String LEVEL_ATLAS = "outside_sprites.png";
+	public static final String LEVEL_ONE_DATA = "level_one_data.png";
+
+	public static BufferedImage GetSpriteAtlas(String fileName) {
+		BufferedImage img = null;
+		InputStream is = LoadSave.class.getResourceAsStream("/" + fileName);
+		try {
+			img = ImageIO.read(is);
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				is.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return img;
+	}
+
+	public static int[][] GetLevelData() {
+		int[][] lvlData = new int[Game.TILES_IN_HEIGHT][Game.TILES_IN_WIDTH];
+		BufferedImage img = GetSpriteAtlas(LEVEL_ONE_DATA);
+
+		for (int j = 0; j < img.getHeight(); j++)
+			for (int i = 0; i < img.getWidth(); i++) {
+				Color color = new Color(img.getRGB(i, j));
+				int value = color.getRed();
+				if (value >= 48)
+					value = 0;
+				lvlData[j][i] = value;
+			}
+		return lvlData;
+
+	}
 }
