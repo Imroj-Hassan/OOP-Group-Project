@@ -73,26 +73,39 @@ import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-
 import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 import inputs.KeyboardInputs;
 import inputs.MouseInputs;
+import static utilz.Constants.PlayerConstants.*;
+import static utilz.Constants.Directions.*;
 
 public class GamePanel extends JPanel {
 	private MouseInputs mouseInputs;
 	private float xDelta=100,yDelta=100;
-	private BufferedImage img, subImg;
+	private BufferedImage img;
+	private BufferedImage[][] animations;
+	private int aniTick,aniIndex,aniSpeed=15;
+	private int playerAction= IDLE;
+	private int playerDir = -1;
+	private boolean moving = false;
 	
      public GamePanel() {
     	 mouseInputs = new MouseInputs(this);
     	 importImg();
+    	 loadAnimations();
     	 setPanelSize();
     	 addKeyListener(new KeyboardInputs(this));
     	 addMouseListener(mouseInputs);
     	 addMouseMotionListener(mouseInputs);
      }
-     private void importImg() {
+     private void loadAnimations() {
+    	 animations= new BufferedImage[9][6];
+    	 for(int j=0; j<animations.length;j++)
+    	 for(int i=0; i<animations[j].length;i++)
+    		 animations[j][i]=img.getSubimage(i*64, j*40, 64, 40);
+	}
+	private void importImg() {
 		InputStream is = getClass().getResourceAsStream("/player_sprites.png");
 		try {
 			img= ImageIO.read(is);
@@ -112,66 +125,99 @@ public class GamePanel extends JPanel {
 		setPreferredSize(size);
 		setMaximumSize(size);
 	}
-	public void changeXDelta(int value) {
-    	this.xDelta += value;
-     }
-     public void changeYDelta(int value) {
-     	this.yDelta += value;
-      }
-     public void setRectPos(int x, int y) {
-    	 this.xDelta=x;
-    	 this.yDelta=y;
-     }
+	public void setdirection(int direction) {
+		this.playerDir =direction;
+		moving = true;
+	}
+	public void setMoving(boolean moving) {
+		this.moving= moving;
+	}
+     private void updateAnimation() {
+ 		aniTick++;
+ 		if(aniTick>=aniSpeed) {
+ 			aniTick=0;
+ 			aniIndex++;
+ 			if(aniIndex>= GetSpriteAmount(playerAction) )
+ 				aniIndex=0;	
+ 		}       
+ 	}
+     private void setAnimation() {
+ 		if(moving)
+ 			playerAction =RUNNING;
+ 		else 
+ 			playerAction =IDLE;
+ 	}
+ 	private void updatePos() {
+ 		if(moving) {
+ 			switch (playerDir) {
+ 			case LEFT:
+ 				xDelta-=5;
+ 				break;
+ 			case UP:
+ 				yDelta-=5;
+ 				break;
+ 			case RIGHT:
+ 				xDelta+=5;
+ 				break;
+ 			case DOWN:
+ 				yDelta+=5;
+ 				break;
+ 			}
+ 		}
+ 			
+	}
      public void paintComponent(Graphics g) {
         super.paintComponent(g);
-        subImg= img.getSubimage(1*64, 8*40, 64, 40);
-        g.drawImage(subImg, (int)xDelta, (int)yDelta,128,80, null);
+        updateAnimation();
+        setAnimation();
+        updatePos();
+        g.drawImage(animations[playerAction][aniIndex], (int)xDelta, (int)yDelta,256,160, null);
      }
 }
 package inputs;
 
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-
 import main.GamePanel;
+import static utilz.Constants.Directions.*;
 
 public class KeyboardInputs implements KeyListener {
 	private GamePanel gamePanel;
 	public KeyboardInputs (GamePanel gamePanel) {
 	this.gamePanel=gamePanel;	
 	}
-
 	@Override
 	public void keyTyped(KeyEvent e) {
-		// TODO Auto-generated method stub
-		
+		// TODO Auto-generated method stub		
 	}
-
-	@Override
-	public void keyPressed(KeyEvent e) {
-		// TODO Auto-generated method stub
-		
-	}
-
 	@Override
 	public void keyReleased(KeyEvent e) {
 		switch(e.getKeyCode()) {
 		case KeyEvent.VK_W:
-			gamePanel.changeYDelta(-5);
+		case KeyEvent.VK_A:
+		case KeyEvent.VK_S:
+		case KeyEvent.VK_D:
+			gamePanel.setMoving(false);
+			break;
+		}		
+	}
+	@Override
+	public void keyPressed(KeyEvent e) {
+		switch(e.getKeyCode()) {
+		case KeyEvent.VK_W:
+			gamePanel.setdirection(UP);
 			break;
 		case KeyEvent.VK_A:
-			gamePanel.changeXDelta(-5);
+			gamePanel.setdirection(LEFT);
 			break;
 		case KeyEvent.VK_S:
-			gamePanel.changeYDelta(5);
+			gamePanel.setdirection(DOWN);
 			break;
 		case KeyEvent.VK_D:
-			gamePanel.changeXDelta(5);
+			gamePanel.setdirection(RIGHT);
 			break;
 		}
-		
 	}
-
 }
 package inputs;
 
@@ -194,7 +240,7 @@ public class MouseInputs implements MouseListener,MouseMotionListener {
 
 	@Override
 	public void mouseMoved(MouseEvent e) {
-		gamePanel.setRectPos(e.getX(),e.getY());	
+		//gamePanel.setRectPos(e.getX(),e.getY());	
 	}
 
 	@Override
@@ -228,4 +274,47 @@ public class MouseInputs implements MouseListener,MouseMotionListener {
 		
 	}
 
+}
+package utilz;
+
+public class Constants {
+	public static class Directions {
+		public static final int LEFT = 0;
+		public static final int UP = 1;
+		public static final int RIGHT = 2;
+		public static final int DOWN = 3;
+	}
+	public static class PlayerConstants{
+		  public static final int IDLE = 0;
+  public static final int RUNNING = 1;
+  public static final int JUMP = 2;
+  public static final int FALLING = 3;
+  public static final int GROUND = 4;
+  public static final int HIT = 5;
+  public static final int ATTACK_1=6;
+  public static final int ATTACK_JUMP_1=7;
+  public static final int ATTACK_JUMP_2=8;
+  
+  public static int GetSpriteAmount(int player_action) {
+	  switch(player_action) {
+	  case RUNNING:
+		  return 6;
+	  case IDLE:
+		  return 5;
+	  case HIT:
+		  return 4;
+	  case JUMP:
+	  case ATTACK_1:
+	  case ATTACK_JUMP_1:
+	  case ATTACK_JUMP_2:
+		  return 3;
+	  case GROUND:
+		  return 2;
+	  case FALLING:
+		  default:
+			  return 1;
+	  }
+  }
+  
+	}
 }
