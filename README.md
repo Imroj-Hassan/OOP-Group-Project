@@ -1,4 +1,4 @@
-Little-Pirate-Game
+# Little-Pirate-Game
 
 This is a simple game developed in Java in Eclipse. Thanks a lot Raihan Ullah Sir.
 By running the code, it opens a menu page. Button instructions :
